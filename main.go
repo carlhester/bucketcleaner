@@ -11,21 +11,37 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+type s3APIClient interface {
+	ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
+	ListObjectVersions(input *s3.ListObjectVersionsInput) (*s3.ListObjectVersionsOutput, error)
+	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
+	WaitUntilBucketNotExists(input *s3.HeadBucketInput) error
+}
+
+type app struct {
+	s3Client   s3APIClient
+	bucketName string
+}
+
 func main() {
 
-	if len(os.Args) != 3 {
-		fmt.Println("Usage: go run main.go <bucket> <region>")
+	if len(os.Args) < 3 {
+		fmt.Printf("Usage: %s BUCKETNAME REGION <really>\n\n", os.Args[0])
+		return
 	}
 
 	bucket := os.Args[1]
 	region := os.Args[2]
 
-	fmt.Printf("Are you sure you want to delete bucket %s? Type yes to continue: ", bucket)
-	input := bufio.NewScanner(os.Stdin)
-	input.Scan()
-	if input.Text() != "yes" {
-		fmt.Println("aborting")
-		os.Exit(0)
+	if !(len(os.Args) == 4 && os.Args[3] == "really") {
+		fmt.Printf("Confirm you want to delete bucket \"%s\"?\nType yes to continue: ", bucket)
+		input := bufio.NewScanner(os.Stdin)
+		input.Scan()
+		if input.Text() != "yes" {
+			fmt.Println("aborting")
+			return
+		}
 	}
 
 	sess := session.Must(session.NewSession(&aws.Config{
@@ -33,11 +49,25 @@ func main() {
 		STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
 	}))
 
-	svc := s3.New(sess)
+	s3Svc := s3.New(sess)
 
-	listObjectOutput, err := svc.ListObjects(
+	app := &app{
+		s3Client:   s3Svc,
+		bucketName: bucket,
+	}
+
+	if err := app.run(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	os.Exit(0)
+
+}
+
+func (a *app) run() error {
+	listObjectOutput, err := a.s3Client.ListObjects(
 		&s3.ListObjectsInput{
-			Bucket: aws.String(bucket),
+			Bucket: aws.String(a.bucketName),
 		})
 
 	if err != nil {
@@ -46,43 +76,42 @@ func main() {
 
 	for _, object := range listObjectOutput.Contents {
 		input := &s3.ListObjectVersionsInput{
-			Bucket: aws.String(bucket),
+			Bucket: aws.String(a.bucketName),
 			Prefix: object.Key,
 		}
 
-		result, err := svc.ListObjectVersions(input)
+		result, err := a.s3Client.ListObjectVersions(input)
 		if err != nil {
 			panic(err)
 		}
 
 		for _, version := range result.Versions {
-			_, err := svc.DeleteObject(&s3.DeleteObjectInput{
-				Bucket:    aws.String(bucket),
+			_, err := a.s3Client.DeleteObject(&s3.DeleteObjectInput{
+				Bucket:    aws.String(a.bucketName),
 				Key:       version.Key,
 				VersionId: version.VersionId,
 			})
 			if err != nil {
-				panic(err)
+				return err
 			}
-			// fmt.Println("Deleted: ", aws.StringValue(version.Key), aws.StringValue(version.VersionId))
-			fmt.Print(".")
 		}
 
 	}
-	_, err = svc.DeleteBucket(&s3.DeleteBucketInput{
-		Bucket: aws.String(bucket),
+	_, err = a.s3Client.DeleteBucket(&s3.DeleteBucketInput{
+		Bucket: aws.String(a.bucketName),
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	err = svc.WaitUntilBucketNotExists(&s3.HeadBucketInput{
-		Bucket: aws.String(bucket),
+	err = a.s3Client.WaitUntilBucketNotExists(&s3.HeadBucketInput{
+		Bucket: aws.String(a.bucketName),
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	fmt.Printf("Deleted bucket: %s\n", bucket)
+	fmt.Printf("Deleted bucket: %s\n", a.bucketName)
+	return nil
 
 }
