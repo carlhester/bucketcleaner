@@ -21,8 +21,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
 
-      - name: shell
+      - name: shell cmds
         run: |
           aws sts get-caller-identity
           aws s3api list-object-versions --bucket cleaner-test-versioned-bucket
+          ls -alh
+          whoami
+          
 
