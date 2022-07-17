@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
-
+      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -23,6 +23,6 @@ jobs:
 
       - name: shell
         run: |
-          go mod tidy
-          go build -o httpgrabber ./app/httpgrabber/src
-          zip httpgrabber.zip ./httpgrabber
+          aws sts get-caller-identity
+
+
