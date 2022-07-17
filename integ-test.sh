@@ -41,34 +41,31 @@ if [ $result -ne 0 ]; then
     exit 1
 fi
 
-# whats in the bucket
-aws s3 ls s3://${BUCKETNAME}
-result=$?
-if [ $result -ne 0 ]; then
-    exit 1
-fi
-
+# get the go dependencies
 go mod tidy
 result=$?
 if [ $result -ne 0 ]; then
     exit 1
 fi
 
+# build the go binary
 go build -o bin ./main.go
 result=$?
 if [ $result -ne 0 ]; then
     exit 1
 fi
 
+# run the binary and delete the bucket that was created above
 ./bin ${BUCKETNAME} us-west-1 really
 result=$?
 if [ $result -ne 0 ]; then
     exit 1
 fi
 
+# try to list the bucket (which should be deleted)
 aws s3 ls s3://${BUCKETNAME}
 result=$?
-# the expected result is a 1; the bucket should not exist
+# the expected result code is a 1; the bucket should not exist
 if [ $result -ne 1 ]; then
     exit 1
 fi
