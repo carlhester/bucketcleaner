@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
+      #- name: Check out repository code
+      #  uses: actions/checkout@v3
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -23,6 +23,5 @@ jobs:
 
       - name: shell
         run: |
-          aws sts get-caller-identity
-
+          aws s3api list-object-versions --bucket cleaner-test-versioned-bucket
 
