@@ -25,5 +25,7 @@ jobs:
         run: |
           chmod +x integ-test.sh
           ./integ-test.sh
+          echo $BUCKETNAME
+          echo aws s3 ls s3://${BUCKETNAME}
           
 

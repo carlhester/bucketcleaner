@@ -23,3 +23,5 @@ aws s3 cp outfile s3://${BUCKETNAME}
 
 # whats in the bucket
 aws s3 ls s3://${BUCKETNAME}
+
+export TESTBUCKET=${BUCKETNAME}
