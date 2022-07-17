@@ -23,9 +23,11 @@ jobs:
 
       - name: shell cmds
         run: |
-          aws sts get-caller-identity
+          aws s3 ls s3://cleaner-test-versioned-bucket
           aws s3api list-object-versions --bucket cleaner-test-versioned-bucket
           ls -alh
-          whoami
+          DATA=`date +%s`
+          echo $DATA > outfile
+          aws s3 cp outfile s3://cleaner-test-versioned-bucket
           
 
