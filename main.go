@@ -16,12 +16,97 @@ type s3APIClient interface {
 	ListObjectVersions(input *s3.ListObjectVersionsInput) (*s3.ListObjectVersionsOutput, error)
 	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
+	PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error)
 	WaitUntilBucketNotExists(input *s3.HeadBucketInput) error
 }
 
 type app struct {
 	s3Client   s3APIClient
 	bucketName string
+}
+
+func denyAllBucketPolicy(bucketName string) string {
+	policy := `{
+		"Version": "2012-10-17",
+		"Id": "S3DenyAllPutObjectPolicy",
+		"Statement": [
+			{
+				"Effect": "Deny",
+				"Principal": "*",
+				"Action": "s3:PutObject",
+				"Resource": [
+					"arn:aws:s3:::%[1]s",
+					"arn:aws:s3:::%[1]s/*"
+				]
+			}
+		]
+	}`
+
+	return fmt.Sprintf(policy, bucketName)
+
+}
+
+func (a *app) run() error {
+	// apply a deny all bucket policy to prevent further writes
+	_, err := a.s3Client.PutBucketPolicy(&s3.PutBucketPolicyInput{
+		Bucket: aws.String(a.bucketName),
+		Policy: aws.String(denyAllBucketPolicy(a.bucketName)),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Get the list of objects in the bucket
+	listObjectOutput, err := a.s3Client.ListObjects(
+		&s3.ListObjectsInput{
+			Bucket: aws.String(a.bucketName),
+		})
+
+	if err != nil {
+		return err
+	}
+
+	for _, object := range listObjectOutput.Contents {
+		input := &s3.ListObjectVersionsInput{
+			Bucket: aws.String(a.bucketName),
+			Prefix: object.Key,
+		}
+
+		result, err := a.s3Client.ListObjectVersions(input)
+		if err != nil {
+			return err
+		}
+
+		for _, version := range result.Versions {
+			_, err := a.s3Client.DeleteObject(&s3.DeleteObjectInput{
+				Bucket:    aws.String(a.bucketName),
+				Key:       version.Key,
+				VersionId: version.VersionId,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	_, err = a.s3Client.DeleteBucket(&s3.DeleteBucketInput{
+		Bucket: aws.String(a.bucketName),
+	})
+	if err != nil {
+		return err
+	}
+
+	err = a.s3Client.WaitUntilBucketNotExists(&s3.HeadBucketInput{
+		Bucket: aws.String(a.bucketName),
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Deleted bucket: %s\n", a.bucketName)
+	return nil
+
 }
 
 func main() {
@@ -61,57 +146,5 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
-
-}
-
-func (a *app) run() error {
-	listObjectOutput, err := a.s3Client.ListObjects(
-		&s3.ListObjectsInput{
-			Bucket: aws.String(a.bucketName),
-		})
-
-	if err != nil {
-		panic(err)
-	}
-
-	for _, object := range listObjectOutput.Contents {
-		input := &s3.ListObjectVersionsInput{
-			Bucket: aws.String(a.bucketName),
-			Prefix: object.Key,
-		}
-
-		result, err := a.s3Client.ListObjectVersions(input)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, version := range result.Versions {
-			_, err := a.s3Client.DeleteObject(&s3.DeleteObjectInput{
-				Bucket:    aws.String(a.bucketName),
-				Key:       version.Key,
-				VersionId: version.VersionId,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-	}
-	_, err = a.s3Client.DeleteBucket(&s3.DeleteBucketInput{
-		Bucket: aws.String(a.bucketName),
-	})
-	if err != nil {
-		return err
-	}
-
-	err = a.s3Client.WaitUntilBucketNotExists(&s3.HeadBucketInput{
-		Bucket: aws.String(a.bucketName),
-	})
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Deleted bucket: %s\n", a.bucketName)
-	return nil
 
 }
