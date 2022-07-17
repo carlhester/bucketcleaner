@@ -104,7 +104,6 @@ func (a *app) run() error {
 		return err
 	}
 
-	fmt.Printf("Deleted bucket: %s\n", a.bucketName)
 	return nil
 
 }
