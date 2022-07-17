@@ -63,9 +63,11 @@ if [ $result -ne 0 ]; then
 fi
 
 # try to list the bucket (which should be deleted)
+# the expected result code is a 1; the bucket should not exist
 aws s3 ls s3://${BUCKETNAME}
 result=$?
-# the expected result code is a 1; the bucket should not exist
-if [ $result -eq 1 ]; then
-    exit 0
+if [ $result -ne 1 ]; then
+    exit 1
 fi
+
+exit 0
