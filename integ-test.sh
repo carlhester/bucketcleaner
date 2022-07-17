@@ -5,7 +5,7 @@ TS=`date +%s`
 UUID=`uuidgen`
 
 # Create the unique bucket
-BUCKETNAME=bucketcleaner-test-bucketname-${TS}-${UUID}
+BUCKETNAME=bucketcleaner-${TS}-${UUID:0:16}
 aws s3 mb s3://${BUCKETNAME}
 
 # add bucket versioning
