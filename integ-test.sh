@@ -68,6 +68,7 @@ fi
 
 aws s3 ls s3://${BUCKETNAME}
 result=$?
-if [ $result -eq 1 ]; then
-    exit 0
+# the expected result is a 1; the bucket should not exist
+if [ $result -ne 1 ]; then
+    exit 1
 fi
