@@ -23,5 +23,6 @@ jobs:
 
       - name: shell
         run: |
+          aws sts get-calller-identity
           aws s3api list-object-versions --bucket cleaner-test-versioned-bucket
 
