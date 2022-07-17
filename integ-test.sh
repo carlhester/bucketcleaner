@@ -66,8 +66,6 @@ fi
 # the expected result code is a 1; the bucket should not exist
 aws s3 ls s3://${BUCKETNAME}
 result=$?
-if [ $result -ne 1 ]; then
-    exit 1
+if [ $result -eq 1 ]; then
+    exit 0
 fi
-
-exit 0
