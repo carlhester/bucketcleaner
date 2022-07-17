@@ -24,4 +24,10 @@ aws s3 cp outfile s3://${BUCKETNAME}
 # whats in the bucket
 aws s3 ls s3://${BUCKETNAME}
 
-export TESTBUCKET=${BUCKETNAME}
+go mod tidy
+
+go build -o bin ./main.go
+
+./bin ${BUCKETNAME} us-west-1 really
+
+aws s3 ls s3://${BUCKETNAME}
