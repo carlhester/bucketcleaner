@@ -1,18 +1,25 @@
 #!/bin/bash
 
+# generate some unique values to use in the name
 TS=`date +%s`
-FILENAME=bucketcleaner-test-bucketname-${TS}-${TS}
-aws s3 mb s3://${FILENAME}
+UUID=`uuidgen`
 
-aws s3 ls s3://${FILENAME}
+# Create the unique bucket
+BUCKETNAME=bucketcleaner-test-bucketname-${TS}-${UUID}
+aws s3 mb s3://${BUCKETNAME}
+
+# add bucket versioning
+aws s3api put-bucket-versioning --bucket ${BUCKETNAME} --versioning-configuration Status=Enabled
+
+# create and overwrite the same file in the bucket multiple times
+uuidgen > outfile
+aws s3 cp outfile s3://${BUCKETNAME}
 
 uuidgen > outfile
-aws s3 cp outfile s3://${FILENAME}
+aws s3 cp outfile s3://${BUCKETNAME}
 
 uuidgen > outfile
-aws s3 cp outfile s3://${FILENAME}
+aws s3 cp outfile s3://${BUCKETNAME}
 
-uuidgen > outfile
-aws s3 cp outfile s3://${FILENAME}
-
-aws s3 ls s3://${FILENAME}
+# whats in the bucket
+aws s3 ls s3://${BUCKETNAME}
