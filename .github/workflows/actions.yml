@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
-      #- name: Check out repository code
-      #  uses: actions/checkout@v3
+      - name: Check out repository code
+        uses: actions/checkout@v3
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -23,11 +23,7 @@ jobs:
 
       - name: shell cmds
         run: |
-          aws s3 ls s3://cleaner-test-versioned-bucket
-          aws s3api list-object-versions --bucket cleaner-test-versioned-bucket
-          ls -alh
-          DATA=`date +%s`
-          echo $DATA > outfile
-          aws s3 cp outfile s3://cleaner-test-versioned-bucket
+          chmod +x integ-test.sh
+          ./integ-test.sh
           
 
