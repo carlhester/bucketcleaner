@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -13,7 +14,9 @@ import (
 
 type s3APIClient interface {
 	ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
+	ListObjectsPages(input *s3.ListObjectsInput, fn func(p *s3.ListObjectsOutput, lastPage bool) bool) error
 	ListObjectVersions(input *s3.ListObjectVersionsInput) (*s3.ListObjectVersionsOutput, error)
+	ListObjectVersionsPages(input *s3.ListObjectVersionsInput, fn func(p *s3.ListObjectVersionsOutput, lastPage bool) bool) error
 	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
 	PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error)
@@ -57,38 +60,53 @@ func (a *app) run() error {
 		return err
 	}
 
-	// Get the list of objects in the bucket
-	listObjectOutput, err := a.s3Client.ListObjects(
-		&s3.ListObjectsInput{
-			Bucket: aws.String(a.bucketName),
+	// List all objects in the bucket
+	bucketContents := []*s3.Object{}
+	err = a.s3Client.ListObjectsPages(&s3.ListObjectsInput{
+		Bucket: aws.String(a.bucketName),
+	},
+		func(page *s3.ListObjectsOutput, lastPage bool) bool {
+			bucketContents = append(bucketContents, page.Contents...)
+			return !lastPage
 		})
 
 	if err != nil {
-		return err
-	}
-
-	for _, object := range listObjectOutput.Contents {
-		input := &s3.ListObjectVersionsInput{
-			Bucket: aws.String(a.bucketName),
-			Prefix: object.Key,
-		}
-
-		result, err := a.s3Client.ListObjectVersions(input)
-		if err != nil {
-			return err
-		}
-
-		for _, version := range result.Versions {
-			_, err := a.s3Client.DeleteObject(&s3.DeleteObjectInput{
-				Bucket:    aws.String(a.bucketName),
-				Key:       version.Key,
-				VersionId: version.VersionId,
-			})
-			if err != nil {
-				return err
+		if aerr, ok := err.(awserr.Error); ok {
+			// If the bucket doesn't exist, consider it a success and return
+			if aerr.Code() == s3.ErrCodeNoSuchBucket {
+				return nil
 			}
 		}
+		return fmt.Errorf("failed to list objects in bucket %s: err: %v", a.bucketName, err)
+	}
 
+	// Get every version of each object
+	objectVersions := []*s3.ObjectVersion{}
+	for _, object := range bucketContents {
+		err = a.s3Client.ListObjectVersionsPages(&s3.ListObjectVersionsInput{
+			Bucket: aws.String(a.bucketName),
+			Prefix: object.Key,
+		},
+			func(page *s3.ListObjectVersionsOutput, lastPage bool) bool {
+				objectVersions = append(objectVersions, page.Versions...)
+				return !lastPage
+			})
+
+		if err != nil {
+			return fmt.Errorf("failed to list object versions: %v. err: %v", object, err)
+		}
+	}
+
+	// for every object version, delete it
+	for _, version := range objectVersions {
+		_, err := a.s3Client.DeleteObject(&s3.DeleteObjectInput{
+			Bucket:    aws.String(a.bucketName),
+			Key:       version.Key,
+			VersionId: version.VersionId,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete object: %v. err: %v", version, err)
+		}
 	}
 	_, err = a.s3Client.DeleteBucket(&s3.DeleteBucketInput{
 		Bucket: aws.String(a.bucketName),
