@@ -13,12 +13,10 @@ import (
 )
 
 type s3APIClient interface {
-	ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
-	ListObjectsPages(input *s3.ListObjectsInput, fn func(p *s3.ListObjectsOutput, lastPage bool) bool) error
-	ListObjectVersions(input *s3.ListObjectVersionsInput) (*s3.ListObjectVersionsOutput, error)
-	ListObjectVersionsPages(input *s3.ListObjectVersionsInput, fn func(p *s3.ListObjectVersionsOutput, lastPage bool) bool) error
-	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
+	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+	ListObjectVersionsPages(input *s3.ListObjectVersionsInput, fn func(p *s3.ListObjectVersionsOutput, lastPage bool) bool) error
+	ListObjectsPages(input *s3.ListObjectsInput, fn func(p *s3.ListObjectsOutput, lastPage bool) bool) error
 	PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error)
 	WaitUntilBucketNotExists(input *s3.HeadBucketInput) error
 }
